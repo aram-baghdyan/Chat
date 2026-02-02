@@ -64,19 +64,19 @@ docker run -p 6379:6379 redis:7-alpine
 
 **Terminal 2 - Start Server:**
 ```bash
-cd Chat.Server
+cd src/Chat.Server
 dotnet run
 ```
 
 **Terminal 3 - Start Client:**
 ```bash
-cd Chat.Client
+cd src/Chat.Client
 dotnet run
 ```
 
 ## Configuration
 
-Server configuration in `Chat.Server/appsettings.json`:
+Server configuration in `src/Chat.Server/appsettings.json`:
 
 ```json
 {
@@ -99,24 +99,30 @@ Server configuration in `Chat.Server/appsettings.json`:
 
 ```
 Chat/
-├── Chat.Contracts/          # Shared interfaces and models
-│   ├── IChatHub.cs         # Hub interface
-│   ├── IChatHubReceiver.cs # Client receiver interface
-│   └── MessageData.cs      # Message model
-├── Chat.Server/            # Server application
-│   ├── Hubs/
-│   │   └── ChatHub.cs      # Hub implementation
-│   ├── Services/
-│   │   ├── IRedisMessageBus.cs
-│   │   ├── RedisMessageBus.cs
-│   │   ├── MessageBroadcaster.cs
-│   │   └── ServerNotificationService.cs
-│   ├── Configuration/
-│   │   └── ChatOptions.cs
-│   └── Program.cs
-├── Chat.Client/            # Console client
-│   └── Program.cs
-└── compose.yaml            # Docker Compose orchestration
+├── src/
+│   ├── Chat.Contracts/          # Shared interfaces and models
+│   │   ├── IChatHub.cs         # Hub interface
+│   │   ├── IChatHubReceiver.cs # Client receiver interface
+│   │   └── MessageData.cs      # Message model
+│   ├── Chat.Server/            # Server application
+│   │   ├── Hubs/
+│   │   │   └── ChatHub.cs      # Hub implementation
+│   │   ├── Services/
+│   │   │   ├── IRedisMessageBus.cs
+│   │   │   ├── RedisMessageBus.cs
+│   │   │   ├── MessageBroadcaster.cs
+│   │   │   └── ServerNotificationService.cs
+│   │   ├── Configuration/
+│   │   │   └── ChatOptions.cs
+│   │   ├── Program.cs
+│   │   ├── appsettings.json
+│   │   └── Dockerfile
+│   └── Chat.Client/            # Console client
+│       ├── Program.cs
+│       └── Dockerfile
+├── docs/                       # Documentation
+├── compose.yaml               # Docker Compose orchestration
+└── Chat.slnx                  # Solution file
 ```
 
 ## Testing Multi-Instance Setup

@@ -8,4 +8,10 @@
         <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
     </PropertyGroup>
 
+    <ItemGroup>
+        <PackageReference Include="MagicOnion.Client" Version="7.0.3" />
+        <PackageReference Include="Grpc.Net.Client" Version="2.71.0" />
+        <PackageReference Include="MessagePack" Version="3.1.1" />
+    </ItemGroup>
+
 </Project>

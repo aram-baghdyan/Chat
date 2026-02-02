@@ -39,7 +39,7 @@ public sealed class MessageBroadcaster : BackgroundService
         // Wait a moment for the server to fully initialize
         await Task.Delay(TimeSpan.FromSeconds(1), stoppingToken);
 
-        await _messageBus.SubscribeAsync(async message =>
+        await _messageBus.SubscribeAsync(message =>
         {
             try
             {
@@ -60,6 +60,8 @@ public sealed class MessageBroadcaster : BackgroundService
             {
                 _logger.LogError(ex, "Failed to broadcast message");
             }
+
+            return Task.CompletedTask;
         }, stoppingToken);
 
         _logger.LogInformation("Message broadcaster running");

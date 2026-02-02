@@ -1,5 +1,7 @@
 <Solution>
-  <Folder Name="/docs/" />
+  <Folder Name="/docs/">
+    <File Path="docs/next-steps.md" />
+  </Folder>
   <Folder Name="/docs/plans/">
     <File Path="docs/plans/2026-02-02-magiconion-chat-system.md" />
   </Folder>

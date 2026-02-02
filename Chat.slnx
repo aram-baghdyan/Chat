@@ -2,6 +2,7 @@
   <Folder Name="/Solution Items/">
     <File Path="compose.yaml" />
   </Folder>
+  <Project Path="Chat.Contracts/Chat.Contracts.csproj" />
   <Project Path="Chat.Client/Chat.Client.csproj" />
   <Project Path="Chat.Server/Chat.Server.csproj" />
 </Solution>

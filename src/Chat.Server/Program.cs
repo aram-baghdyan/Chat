@@ -49,6 +49,12 @@ try
 
     builder.Services.AddMagicOnion();
 
+    // gRPC reflection for development
+    if (builder.Environment.IsDevelopment())
+    {
+        builder.Services.AddGrpcReflection();
+    }
+
     // Background services
     builder.Services.AddHostedService<MessageBroadcaster>();
     builder.Services.AddHostedService<ServerNotificationService>();

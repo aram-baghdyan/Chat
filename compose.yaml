@@ -12,7 +12,7 @@ services:
       - chat-network
 
   chat.server:
-    image: chat.server
+    image: local/chat.server
     build:
       context: .
       dockerfile: src/Chat.Server/Dockerfile
@@ -28,7 +28,7 @@ services:
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8080/health/ready || exit 1"]
+      test: ["CMD-SHELL", "curl -f --http2-prior-knowledge http://localhost:8080/health/ready || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -38,7 +38,7 @@ services:
     restart: unless-stopped
 
   chat.server.2:
-    image: chat.server
+    image: local/chat.server
     build:
       context: .
       dockerfile: src/Chat.Server/Dockerfile
@@ -56,7 +56,7 @@ services:
       chat.server:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8080/health/ready || exit 1"]
+      test: ["CMD-SHELL", "curl -f --http2-prior-knowledge http://localhost:8080/health/ready || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -64,19 +64,6 @@ services:
     networks:
       - chat-network
     restart: unless-stopped
-
-  chat.client:
-    image: chat.client
-    build:
-      context: .
-      dockerfile: src/Chat.Client/Dockerfile
-    stdin_open: true
-    tty: true
-    depends_on:
-      chat.server:
-        condition: service_healthy
-    networks:
-      - chat-network
 
 networks:
   chat-network:

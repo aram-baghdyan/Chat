@@ -3,6 +3,9 @@ using Grpc.Core;
 using Grpc.Net.Client;
 using MagicOnion.Client;
 
+// Allow HTTP/2 without TLS (required for gRPC without HTTPS)
+AppContext.SetSwitch("System.Net.Http.SocketsHttpHandler.Http2UnencryptedSupport", true);
+
 Console.WriteLine("=== MagicOnion Chat Client ===");
 Console.WriteLine();
 
@@ -29,17 +32,17 @@ Console.WriteLine($"Connecting to {serverAddress} as {username}...");
 
 try
 {
-    // Create gRPC channel
+    // Create gRPC channel (HTTP/2 without TLS)
     var channel = GrpcChannel.ForAddress(serverAddress, new GrpcChannelOptions
     {
         MaxReceiveMessageSize = 4 * 1024 * 1024,
-        MaxSendMessageSize = 4 * 1024 * 1024,
-        Credentials = ChannelCredentials.Insecure
+        MaxSendMessageSize = 4 * 1024 * 1024
     });
 
     // Create receiver
     var receiver = new ChatReceiver();
 
+    
     // Connect to hub
     var hub = await StreamingHubClient.ConnectAsync<IChatHub, IChatHubReceiver>(
         channel,

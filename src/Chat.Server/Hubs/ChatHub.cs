@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using Chat.Contracts;
 using Chat.Server.Services;
 using MagicOnion.Server.Hubs;
@@ -13,10 +14,11 @@ public sealed class ChatHub : StreamingHubBase<IChatHub, IChatHubReceiver>, ICha
 {
     private readonly ILogger<ChatHub> _logger;
     private readonly IRedisMessageBus _messageBus;
-    private readonly IGroup<IChatHubReceiver> _broadcastGroup;
+    private static readonly ConcurrentDictionary<string, IGroup<IChatHubReceiver>> _globalGroups = new();
 
     private string _username = string.Empty;
     private bool _isJoined;
+    private IGroup<IChatHubReceiver>? _myGroup;
 
     public ChatHub(
         ILogger<ChatHub> logger,
@@ -24,7 +26,25 @@ public sealed class ChatHub : StreamingHubBase<IChatHub, IChatHubReceiver>, ICha
     {
         _logger = logger;
         _messageBus = messageBus;
-        _broadcastGroup = Group.AddAsync("Global").GetAwaiter().GetResult();
+    }
+
+    /// <summary>
+    /// Called by MessageBroadcaster to broadcast messages to all connected clients.
+    /// </summary>
+    internal static void BroadcastToAll(MessageData message)
+    {
+        // Broadcast to all tracked group instances
+        foreach (var group in _globalGroups.Values)
+        {
+            try
+            {
+                group.All.OnReceiveMessage(message);
+            }
+            catch
+            {
+                // Ignore broadcast errors for individual groups
+            }
+        }
     }
 
     /// <inheritdoc />
@@ -44,6 +64,12 @@ public sealed class ChatHub : StreamingHubBase<IChatHub, IChatHubReceiver>, ICha
 
         _username = username;
         _isJoined = true;
+
+        // Add to global broadcast group and store reference
+        _myGroup = await Group.AddAsync("Global");
+
+        // Track this group for broadcasting from Redis messages
+        _globalGroups.TryAdd(Context.ContextId.ToString(), _myGroup);
 
         _logger.LogInformation("User {Username} joined the chat (ContextId: {ContextId})",
             _username, Context.ContextId);
@@ -115,6 +141,9 @@ public sealed class ChatHub : StreamingHubBase<IChatHub, IChatHubReceiver>, ICha
 
     protected override async ValueTask OnDisconnected()
     {
+        // Remove from tracking
+        _globalGroups.TryRemove(Context.ContextId.ToString(), out _);
+
         if (_isJoined)
         {
             await LeaveAsync();

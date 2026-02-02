@@ -3,16 +3,16 @@ ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
 
 # Copy project files
-COPY ["Chat.Client/Chat.Client.csproj", "Chat.Client/"]
-COPY ["Chat.Contracts/Chat.Contracts.csproj", "Chat.Contracts/"]
+COPY ["src/Chat.Client/Chat.Client.csproj", "src/Chat.Client/"]
+COPY ["src/Chat.Contracts/Chat.Contracts.csproj", "src/Chat.Contracts/"]
 
 # Restore dependencies
-RUN dotnet restore "Chat.Client/Chat.Client.csproj"
+RUN dotnet restore "src/Chat.Client/Chat.Client.csproj"
 
 # Copy source code
 COPY . .
 
-WORKDIR "/src/Chat.Client"
+WORKDIR "/src/src/Chat.Client"
 RUN dotnet build "Chat.Client.csproj" -c $BUILD_CONFIGURATION -o /app/build
 
 FROM build AS publish

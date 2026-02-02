@@ -1,8 +1,15 @@
 <Solution>
-  <Folder Name="/Solution Items/">
-    <File Path="compose.yaml" />
+  <Folder Name="/docs/" />
+  <Folder Name="/docs/plans/">
+    <File Path="docs/plans/2026-02-02-magiconion-chat-system.md" />
   </Folder>
-  <Project Path="Chat.Contracts/Chat.Contracts.csproj" />
-  <Project Path="Chat.Client/Chat.Client.csproj" />
-  <Project Path="Chat.Server/Chat.Server.csproj" />
+  <Folder Name="/root/">
+    <File Path="compose.yaml" />
+    <File Path="README.md" />
+  </Folder>
+  <Folder Name="/src/">
+    <Project Path="src/Chat.Client/Chat.Client.csproj" />
+    <Project Path="src/Chat.Server/Chat.Server.csproj" />
+    <Project Path="src/Chat.Contracts/Chat.Contracts.csproj" />
+  </Folder>
 </Solution>

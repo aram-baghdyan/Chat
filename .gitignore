@@ -74,11 +74,6 @@ bld/
 *.nuget.props
 *.nuget.targets
 
-# Docker
-**/.dockerignore
-**/docker-compose*
-**/Dockerfile*
-
 # Others
 *.cache
 *.publishsettings

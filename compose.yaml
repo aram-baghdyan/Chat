@@ -15,7 +15,7 @@ services:
     image: chat.server
     build:
       context: .
-      dockerfile: Chat.Server/Dockerfile
+      dockerfile: src/Chat.Server/Dockerfile
     ports:
       - "5000:8080"
     environment:
@@ -41,7 +41,7 @@ services:
     image: chat.server
     build:
       context: .
-      dockerfile: Chat.Server/Dockerfile
+      dockerfile: src/Chat.Server/Dockerfile
     ports:
       - "5001:8080"
     environment:
@@ -69,7 +69,7 @@ services:
     image: chat.client
     build:
       context: .
-      dockerfile: Chat.Client/Dockerfile
+      dockerfile: src/Chat.Client/Dockerfile
     stdin_open: true
     tty: true
     depends_on:

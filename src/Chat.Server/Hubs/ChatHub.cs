@@ -1,8 +1,5 @@
-using System.Collections.Concurrent;
 using Chat.Contracts;
-using Chat.Server.Services;
 using MagicOnion.Server.Hubs;
-using MessagePack;
 
 namespace Chat.Server.Hubs;
 
@@ -13,42 +10,17 @@ namespace Chat.Server.Hubs;
 public sealed class ChatHub : StreamingHubBase<IChatHub, IChatHubReceiver>, IChatHub
 {
     private readonly ILogger<ChatHub> _logger;
-    private readonly IRedisMessageBus _messageBus;
-    private static readonly ConcurrentDictionary<string, IGroup<IChatHubReceiver>> _globalGroups = new();
+    private string? _username;
+    private bool _isJoined = false;
+    private IGroup<IChatHubReceiver>? _group;
 
-    private string _username = string.Empty;
-    private bool _isJoined;
-    private IGroup<IChatHubReceiver>? _myGroup;
-
-    public ChatHub(
-        ILogger<ChatHub> logger,
-        IRedisMessageBus messageBus)
+    public ChatHub(ILogger<ChatHub> logger)
     {
         _logger = logger;
-        _messageBus = messageBus;
-    }
-
-    /// <summary>
-    /// Called by MessageBroadcaster to broadcast messages to all connected clients.
-    /// </summary>
-    internal static void BroadcastToAll(MessageData message)
-    {
-        // Broadcast to all tracked group instances
-        foreach (var group in _globalGroups.Values)
-        {
-            try
-            {
-                group.All.OnReceiveMessage(message);
-            }
-            catch
-            {
-                // Ignore broadcast errors for individual groups
-            }
-        }
     }
 
     /// <inheritdoc />
-    public async Task JoinAsync(string username)
+    public async Task JoinAsync(string username, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(username))
         {
@@ -56,20 +28,11 @@ public sealed class ChatHub : StreamingHubBase<IChatHub, IChatHubReceiver>, ICha
             throw new ArgumentException("Username cannot be empty", nameof(username));
         }
 
-        if (_isJoined)
-        {
-            _logger.LogWarning("Client {Username} attempted to join twice", _username);
-            return;
-        }
-
         _username = username;
         _isJoined = true;
-
+        
         // Add to global broadcast group and store reference
-        _myGroup = await Group.AddAsync("Global");
-
-        // Track this group for broadcasting from Redis messages
-        _globalGroups.TryAdd(Context.ContextId.ToString(), _myGroup);
+        _group = await Group.AddAsync(Constants.GlobalGroupName);
 
         _logger.LogInformation("User {Username} joined the chat (ContextId: {ContextId})",
             _username, Context.ContextId);
@@ -83,15 +46,16 @@ public sealed class ChatHub : StreamingHubBase<IChatHub, IChatHubReceiver>, ICha
             TimestampUtc = DateTime.UtcNow
         };
 
-        await _messageBus.PublishMessageAsync(joinMessage);
+        _group.All.OnReceiveMessage(joinMessage);
     }
 
+    /// <param name="cancellationToken"></param>
     /// <inheritdoc />
-    public async Task LeaveAsync()
+    public ValueTask LeaveAsync(CancellationToken cancellationToken = default)
     {
         if (!_isJoined)
         {
-            return;
+            return ValueTask.CompletedTask;
         }
 
         _logger.LogInformation("User {Username} left the chat", _username);
@@ -104,16 +68,17 @@ public sealed class ChatHub : StreamingHubBase<IChatHub, IChatHubReceiver>, ICha
             IsServerMessage = true,
             TimestampUtc = DateTime.UtcNow
         };
-
-        await _messageBus.PublishMessageAsync(leaveMessage);
-
+        
+        SendMessagesToGroup(_group, leaveMessage);
         _isJoined = false;
+        
+        return ValueTask.CompletedTask;
     }
 
     /// <inheritdoc />
-    public async Task SendMessageAsync(string message)
+    public ValueTask SendMessageAsync(string message, CancellationToken cancellationToken = default)
     {
-        if (!_isJoined)
+        if (!_isJoined || _username is null)
         {
             _logger.LogWarning("Client attempted to send message without joining");
             throw new InvalidOperationException("Must join chat before sending messages");
@@ -122,7 +87,7 @@ public sealed class ChatHub : StreamingHubBase<IChatHub, IChatHubReceiver>, ICha
         if (string.IsNullOrWhiteSpace(message))
         {
             _logger.LogDebug("User {Username} sent empty message", _username);
-            return;
+            return ValueTask.CompletedTask;
         }
 
         var messageData = new MessageData
@@ -135,20 +100,45 @@ public sealed class ChatHub : StreamingHubBase<IChatHub, IChatHubReceiver>, ICha
 
         _logger.LogDebug("User {Username} sending message: {Message}", _username, message);
 
-        // Publish to Redis for distribution across all server instances
-        await _messageBus.PublishMessageAsync(messageData);
+        SendMessagesToGroup(_group, messageData);
+        
+        return ValueTask.CompletedTask;
+    }
+
+    /// <inheritdoc />
+    public ValueTask ServerPingAsync(CancellationToken cancellationToken = default)
+    {
+        var notificationTime = DateTime.UtcNow;
+        SendMessagesToGroup(
+            _group,
+            new MessageData
+            {
+                Message = $"Server time: {notificationTime:yyyy-MM-dd HH:mm:ss} UTC",
+                TimestampUtc = notificationTime,
+                IsServerMessage = true,
+                Username = "[SERVER]"
+            });
+        
+        return ValueTask.CompletedTask;
     }
 
     protected override async ValueTask OnDisconnected()
     {
-        // Remove from tracking
-        _globalGroups.TryRemove(Context.ContextId.ToString(), out _);
-
         if (_isJoined)
         {
             await LeaveAsync();
         }
 
         await base.OnDisconnected();
+    }
+
+    private static void SendMessagesToGroup(IGroup<IChatHubReceiver>? group, MessageData message)
+    {
+        if (group is null)
+        {
+            throw new InvalidOperationException("Group not initialized");
+        }
+        
+        group.All.OnReceiveMessage(message);
     }
 }

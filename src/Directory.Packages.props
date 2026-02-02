@@ -1,0 +1,20 @@
+﻿<Project>
+  <ItemGroup>
+    <PackageVersion Include="MagicOnion.Client" Version="7.0.3"/>
+    <PackageVersion Include="Grpc.Net.Client" Version="2.71.0"/>
+    <PackageVersion Include="MessagePack" Version="3.1.1"/>
+    <PackageVersion Include="MagicOnion.Abstractions" Version="7.0.3"/>
+    <PackageVersion Include="MessagePack.Annotations" Version="3.1.1"/>
+    <PackageVersion Include="MagicOnion.Server" Version="7.0.3"/>
+    <PackageVersion Include="MagicOnion.Server.Redis" Version="7.0.3"/>
+    <PackageVersion Include="Grpc.AspNetCore" Version="2.71.0"/>
+    <PackageVersion Include="Grpc.AspNetCore.Server.Reflection" Version="2.71.0"/>
+    <PackageVersion Include="StackExchange.Redis" Version="2.8.16"/>
+    <PackageVersion Include="AspNetCore.HealthChecks.Redis" Version="9.0.0"/>
+    <PackageVersion Include="AspNetCore.HealthChecks.Uris" Version="9.0.0"/>
+    <PackageVersion Include="Serilog.AspNetCore" Version="9.0.0"/>
+    <PackageVersion Include="Serilog.Enrichers.Environment" Version="3.0.1"/>
+    <PackageVersion Include="Serilog.Enrichers.Thread" Version="4.0.0"/>
+    <PackageVersion Include="Serilog.Sinks.Console" Version="6.0.0"/>
+  </ItemGroup>
+</Project>

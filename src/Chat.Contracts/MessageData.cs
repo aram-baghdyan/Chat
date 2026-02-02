@@ -6,29 +6,35 @@ namespace Chat.Contracts;
 /// Represents a chat message sent between client and server.
 /// </summary>
 [MessagePackObject]
-public sealed class MessageData
+public sealed record MessageData
 {
     /// <summary>
-    /// Username of the sender. Empty for server-initiated messages.
+    /// MessageId of the message.
     /// </summary>
-    [Key(0)]
-    public string Username { get; init; } = string.Empty;
+    [Key(0)]                                                                                                                                                                                             
+    public Guid MessageId { get; } = Guid.NewGuid();   
+    
+    /// <summary>
+    /// Username of the sender or server name if originated from server.
+    /// </summary>
+    [Key(1)]
+    public required string Username { get; init; }
 
     /// <summary>
     /// The message content.
     /// </summary>
-    [Key(1)]
-    public string Message { get; init; } = string.Empty;
+    [Key(2)]
+    public required string Message { get; init; }
 
     /// <summary>
     /// When true, indicates this message originated from the server.
     /// </summary>
-    [Key(2)]
-    public bool IsServerMessage { get; init; }
+    [Key(3)]
+    public required bool IsServerMessage { get; init; }
 
     /// <summary>
     /// UTC timestamp when the message was created.
     /// </summary>
-    [Key(3)]
-    public DateTime TimestampUtc { get; init; } = DateTime.UtcNow;
+    [Key(4)]
+    public required DateTime TimestampUtc { get; init; }
 }

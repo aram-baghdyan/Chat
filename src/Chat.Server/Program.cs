@@ -1,5 +1,4 @@
 using Chat.Server.Configuration;
-using Chat.Server.Hubs;
 using Chat.Server.Services;
 using Serilog;
 using StackExchange.Redis;
@@ -36,9 +35,6 @@ try
         return ConnectionMultiplexer.Connect(options);
     });
 
-    // Redis message bus
-    builder.Services.AddSingleton<IRedisMessageBus, RedisMessageBus>();
-
     // MagicOnion gRPC services
     builder.Services.AddGrpc(options =>
     {
@@ -47,7 +43,8 @@ try
         options.EnableDetailedErrors = builder.Environment.IsDevelopment();
     });
 
-    builder.Services.AddMagicOnion();
+    builder.Services.AddMagicOnion()
+        .UseRedisGroup(config => config.ConnectionString = redisConnectionString, true);
 
     // gRPC reflection for development
     if (builder.Environment.IsDevelopment())
@@ -56,7 +53,6 @@ try
     }
 
     // Background services
-    builder.Services.AddHostedService<MessageBroadcaster>();
     builder.Services.AddHostedService<ServerNotificationService>();
 
     // Health checks

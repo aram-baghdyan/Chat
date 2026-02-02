@@ -1,5 +1,7 @@
 using Chat.Contracts;
 using Chat.Server.Configuration;
+using Grpc.Net.Client;
+using MagicOnion.Client;
 using Microsoft.Extensions.Options;
 
 namespace Chat.Server.Services;
@@ -10,16 +12,13 @@ namespace Chat.Server.Services;
 /// </summary>
 public sealed class ServerNotificationService : BackgroundService
 {
-    private readonly IRedisMessageBus _messageBus;
     private readonly ILogger<ServerNotificationService> _logger;
     private readonly ChatOptions _options;
 
     public ServerNotificationService(
-        IRedisMessageBus messageBus,
-        ILogger<ServerNotificationService> logger,
-        IOptions<ChatOptions> options)
+        IOptions<ChatOptions> options,
+        ILogger<ServerNotificationService> logger)
     {
-        _messageBus = messageBus;
         _logger = logger;
         _options = options.Value;
     }
@@ -40,36 +39,48 @@ public sealed class ServerNotificationService : BackgroundService
         await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
 
         var interval = TimeSpan.FromSeconds(_options.ServerNotificationIntervalSeconds);
-
+        
         while (!stoppingToken.IsCancellationRequested)
         {
             try
             {
-                await Task.Delay(interval, stoppingToken);
-
-                var notification = new MessageData
-                {
-                    Username = "SERVER",
-                    Message = $"Server time: {DateTime.UtcNow:yyyy-MM-dd HH:mm:ss} UTC",
-                    IsServerMessage = true,
-                    TimestampUtc = DateTime.UtcNow
-                };
-
-                await _messageBus.PublishMessageAsync(notification, stoppingToken);
-
-                _logger.LogDebug("Sent periodic server notification");
+                await RunNotificationLoopAsync(interval, stoppingToken);
             }
-            catch (OperationCanceledException)
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
-                // Expected during shutdown
                 break;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error sending server notification");
+                _logger.LogError(ex, "Notification loop failed, reconnecting in 5s");
+                await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
             }
         }
 
         _logger.LogInformation("Server notification service stopped");
+    }
+
+    private static async Task RunNotificationLoopAsync(TimeSpan interval, CancellationToken cancellationToken)
+    {
+        var channel = GrpcChannel.ForAddress("http://localhost:8080", new GrpcChannelOptions
+        {
+            MaxReceiveMessageSize = 4 * 1024 * 1024,
+            MaxSendMessageSize = 4 * 1024 * 1024
+        });
+        var hub = await StreamingHubClient.ConnectAsync<IChatHub, IChatHubReceiver>(
+            channel, new NoOpReceiver(), cancellationToken: cancellationToken);
+        
+        try
+        {
+            using var timer = new PeriodicTimer(interval);                                                                                                                                                           
+            while (await timer.WaitForNextTickAsync(cancellationToken))                                                                                                                                                  
+            {   
+                hub.ServerPingAsync();
+            }
+        }
+        finally
+        {
+            await hub.DisposeAsync();
+        }
     }
 }

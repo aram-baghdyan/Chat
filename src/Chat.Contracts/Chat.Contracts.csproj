@@ -1,14 +1,15 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
-
+  
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <RootNamespace>Chat.Contracts</RootNamespace>
   </PropertyGroup>
-
+  
   <ItemGroup>
-    <PackageReference Include="MagicOnion.Abstractions" Version="7.0.3" />
-    <PackageReference Include="MessagePack.Annotations" Version="3.1.1" />
+    <PackageReference Include="MagicOnion.Abstractions" />
+    <PackageReference Include="MessagePack.Annotations" />
   </ItemGroup>
 
 </Project>

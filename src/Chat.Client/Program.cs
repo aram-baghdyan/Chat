@@ -30,6 +30,13 @@ while (string.IsNullOrWhiteSpace(username))
 Console.WriteLine();
 Console.WriteLine($"Connecting to {serverAddress} as {username}...");
 
+var cts = new CancellationTokenSource();
+Console.CancelKeyPress += async (_, e) =>                                                                                                                                                                
+{                                                                                                                                                                                                        
+    e.Cancel = true;                                                                                                                                                                                     
+    await cts.CancelAsync();                                                                                                                                                                             
+};  
+
 try
 {
     // Create gRPC channel (HTTP/2 without TLS)
@@ -41,7 +48,6 @@ try
 
     // Create receiver
     var receiver = new ChatReceiver();
-
     
     // Connect to hub
     var hub = await StreamingHubClient.ConnectAsync<IChatHub, IChatHubReceiver>(
@@ -50,12 +56,11 @@ try
 
     Console.WriteLine("Connected! Type your messages (or 'exit' to quit):");
     Console.WriteLine(new string('-', 60));
-
+    
     // Join chat
     await hub.JoinAsync(username);
 
     // Start message reading loop
-    var cts = new CancellationTokenSource();
     var readTask = Task.Run(async () =>
     {
         while (!cts.Token.IsCancellationRequested)
@@ -75,7 +80,7 @@ try
                     break;
                 }
 
-                await hub.SendMessageAsync(input);
+                hub.SendMessageAsync(input);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
@@ -103,29 +108,4 @@ catch (RpcException ex)
 catch (Exception ex)
 {
     Console.WriteLine($"Unexpected error: {ex.Message}");
-}
-
-/// <summary>
-/// Receives and displays messages from the server.
-/// </summary>
-sealed class ChatReceiver : IChatHubReceiver
-{
-    public void OnReceiveMessage(MessageData message)
-    {
-        var timestamp = message.TimestampUtc.ToLocalTime().ToString("HH:mm:ss");
-
-        if (message.IsServerMessage)
-        {
-            // Server messages with prefix
-            var color = Console.ForegroundColor;
-            Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.WriteLine($"[{timestamp}] [SERVER]: {message.Message}");
-            Console.ForegroundColor = color;
-        }
-        else
-        {
-            // Regular user messages
-            Console.WriteLine($"[{timestamp}] {message.Username}: {message.Message}");
-        }
-    }
 }

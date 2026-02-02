@@ -1,0 +1,19 @@
+﻿services:
+  chat.server:
+    image: chat.server
+    build:
+      context: .
+      dockerfile: Chat.Server/Dockerfile
+
+  chat.client:
+    image: chat.client
+    build:
+      context: .
+      dockerfile: Chat.Client/Dockerfile
+
+  chat.client-1:
+    image: chat.client-1
+    build:
+      context: .
+      dockerfile: Chat.Client/Dockerfile
+

@@ -1,19 +1,83 @@
-﻿services:
+services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - chat-network
+
   chat.server:
     image: chat.server
     build:
       context: .
       dockerfile: Chat.Server/Dockerfile
+    ports:
+      - "5000:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:8080
+      - Redis__ConnectionString=redis:6379,abortConnect=false
+      - Chat__ServerNotificationIntervalSeconds=30
+      - Chat__EnableServerNotifications=true
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/health/ready || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - chat-network
+    restart: unless-stopped
+
+  chat.server.2:
+    image: chat.server
+    build:
+      context: .
+      dockerfile: Chat.Server/Dockerfile
+    ports:
+      - "5001:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:8080
+      - Redis__ConnectionString=redis:6379,abortConnect=false
+      - Chat__ServerNotificationIntervalSeconds=30
+      - Chat__EnableServerNotifications=false
+    depends_on:
+      redis:
+        condition: service_healthy
+      chat.server:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/health/ready || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - chat-network
+    restart: unless-stopped
 
   chat.client:
     image: chat.client
     build:
       context: .
       dockerfile: Chat.Client/Dockerfile
+    stdin_open: true
+    tty: true
+    depends_on:
+      chat.server:
+        condition: service_healthy
+    networks:
+      - chat-network
 
-  chat.client-1:
-    image: chat.client-1
-    build:
-      context: .
-      dockerfile: Chat.Client/Dockerfile
-
+networks:
+  chat-network:
+    driver: bridge

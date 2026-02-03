@@ -86,7 +86,6 @@ try
     });
 
     Log.Information("Starting Chat Server on {Environment}", app.Environment.EnvironmentName);
-    Log.Information("Redis: {Redis}", redisConnectionString);
 
     await app.RunAsync();
 

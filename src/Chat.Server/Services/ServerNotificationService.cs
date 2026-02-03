@@ -60,14 +60,14 @@ public sealed class ServerNotificationService : BackgroundService
         _logger.LogInformation("Server notification service stopped");
     }
 
-    private static async Task RunNotificationLoopAsync(TimeSpan interval, CancellationToken cancellationToken)
+    private async Task RunNotificationLoopAsync(TimeSpan interval, CancellationToken cancellationToken)
     {
-        var channel = GrpcChannel.ForAddress("http://localhost:8080", new GrpcChannelOptions
+        using var channel = GrpcChannel.ForAddress(_options.ServerAddress, new GrpcChannelOptions
         {
             MaxReceiveMessageSize = 4 * 1024 * 1024,
             MaxSendMessageSize = 4 * 1024 * 1024
         });
-        var hub = await StreamingHubClient.ConnectAsync<IChatHub, IChatHubReceiver>(
+        await using var hub = await StreamingHubClient.ConnectAsync<IChatHub, IChatHubReceiver>(
             channel, new NoOpReceiver(), cancellationToken: cancellationToken);
         
         try

@@ -1,5 +1,7 @@
 using Chat.Contracts;
+using Chat.Server.Configuration;
 using MagicOnion.Server.Hubs;
+using Microsoft.Extensions.Options;
 
 namespace Chat.Server.Hubs;
 
@@ -9,13 +11,15 @@ namespace Chat.Server.Hubs;
 /// </summary>
 public sealed class ChatHub : StreamingHubBase<IChatHub, IChatHubReceiver>, IChatHub
 {
+    private readonly ChatOptions _options;
     private readonly ILogger<ChatHub> _logger;
     private string? _username;
     private bool _isJoined = false;
     private IGroup<IChatHubReceiver>? _group;
 
-    public ChatHub(ILogger<ChatHub> logger)
+    public ChatHub(IOptions<ChatOptions> options, ILogger<ChatHub> logger)
     {
+        _options = options.Value;
         _logger = logger;
     }
 
@@ -26,6 +30,13 @@ public sealed class ChatHub : StreamingHubBase<IChatHub, IChatHubReceiver>, ICha
         {
             _logger.LogWarning("Client attempted to join with empty username");
             throw new ArgumentException("Username cannot be empty", nameof(username));
+        }
+        
+        if (username.Length > _options.MaxUsernameLength)
+        {
+            _logger.LogWarning("Client attempted to join with username exceeding max length ({Length} > {MaxLength})",
+                username.Length, _options.MaxUsernameLength);
+            throw new ArgumentException($"Username cannot exceed {_options.MaxUsernameLength} characters", nameof(username));
         }
 
         _username = username;

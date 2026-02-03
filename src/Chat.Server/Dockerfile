@@ -5,8 +5,8 @@ WORKDIR /src
 # Copy project files
 COPY ["src/Chat.Server/Chat.Server.csproj", "src/Chat.Server/"]
 COPY ["src/Chat.Contracts/Chat.Contracts.csproj", "src/Chat.Contracts/"]
-COPY ["src/Directory.Build.props", "src/"]
-COPY ["src/Directory.Packages.props", "src/"]
+COPY ["Directory.Build.props", "src/"]
+COPY ["Directory.Packages.props", "src/"]
 
 # Restore dependencies
 RUN dotnet restore "src/Chat.Server/Chat.Server.csproj"

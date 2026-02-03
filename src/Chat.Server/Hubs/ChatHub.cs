@@ -2,6 +2,8 @@ using Chat.Contracts;
 using Chat.Server.Configuration;
 using MagicOnion.Server.Hubs;
 using Microsoft.Extensions.Options;
+using System.Diagnostics;
+using System.Diagnostics.Metrics;
 
 namespace Chat.Server.Hubs;
 
@@ -11,6 +13,30 @@ namespace Chat.Server.Hubs;
 /// </summary>
 public sealed class ChatHub : StreamingHubBase<IChatHub, IChatHubReceiver>, IChatHub
 {
+    private static readonly Meter Meter = new("Chat.Server", "1.0.0");
+
+    private static readonly UpDownCounter<int> ActiveConnections =
+        Meter.CreateUpDownCounter<int>("chat.connections.active",
+            description: "Number of currently connected users");
+
+    private static readonly Counter<long> JoinsTotal =
+        Meter.CreateCounter<long>("chat.joins.total",
+            description: "Total join attempts");
+
+    private static readonly Counter<long> MessagesSent =
+        Meter.CreateCounter<long>("chat.messages.sent",
+            description: "Total messages broadcast");
+
+    private static readonly Histogram<long> MessageBytes =
+        Meter.CreateHistogram<long>("chat.messages.bytes",
+            unit: "By",
+            description: "Size of broadcast message payloads");
+
+    private static readonly Histogram<double> BroadcastDuration =
+        Meter.CreateHistogram<double>("chat.group.broadcast.duration",
+            unit: "ms",
+            description: "Time to broadcast a message through the Redis group");
+
     private readonly ChatOptions _options;
     private readonly ILogger<ChatHub> _logger;
     private string? _username;
@@ -29,19 +55,23 @@ public sealed class ChatHub : StreamingHubBase<IChatHub, IChatHubReceiver>, ICha
         if (string.IsNullOrWhiteSpace(username))
         {
             _logger.LogWarning("Client attempted to join with empty username");
+            JoinsTotal.Add(1, new KeyValuePair<string, object?>("outcome", "rejected"));
             throw new ArgumentException("Username cannot be empty", nameof(username));
         }
-        
+
         if (username.Length > _options.MaxUsernameLength)
         {
             _logger.LogWarning("Client attempted to join with username exceeding max length ({Length} > {MaxLength})",
                 username.Length, _options.MaxUsernameLength);
+            JoinsTotal.Add(1, new KeyValuePair<string, object?>("outcome", "rejected"));
             throw new ArgumentException($"Username cannot exceed {_options.MaxUsernameLength} characters", nameof(username));
         }
 
         _username = username;
         _isJoined = true;
-        
+        JoinsTotal.Add(1, new KeyValuePair<string, object?>("outcome", "success"));
+        ActiveConnections.Add(1);
+
         // Add to global broadcast group and store reference
         _group = await Group.AddAsync(Constants.GlobalGroupName);
 
@@ -54,10 +84,10 @@ public sealed class ChatHub : StreamingHubBase<IChatHub, IChatHubReceiver>, ICha
             Username = "System",
             Message = $"{_username} joined the chat",
             IsServerMessage = true,
-            TimestampUtc = DateTime.UtcNow
+            TimestampUtc = DateTimeOffset.UtcNow
         };
 
-        _group.All.OnReceiveMessage(joinMessage);
+        SendMessagesToGroup(_group, joinMessage);
     }
 
     /// <inheritdoc />
@@ -69,6 +99,7 @@ public sealed class ChatHub : StreamingHubBase<IChatHub, IChatHubReceiver>, ICha
         }
 
         _logger.LogInformation("User {Username} left the chat", _username);
+        ActiveConnections.Add(-1);
 
         // Publish leave notification to all instances
         var leaveMessage = new MessageData
@@ -76,7 +107,7 @@ public sealed class ChatHub : StreamingHubBase<IChatHub, IChatHubReceiver>, ICha
             Username = "System",
             Message = $"{_username} left the chat",
             IsServerMessage = true,
-            TimestampUtc = DateTime.UtcNow
+            TimestampUtc = DateTimeOffset.UtcNow
         };
         
         SendMessagesToGroup(_group, leaveMessage);
@@ -105,7 +136,7 @@ public sealed class ChatHub : StreamingHubBase<IChatHub, IChatHubReceiver>, ICha
             Username = _username,
             Message = message,
             IsServerMessage = false,
-            TimestampUtc = DateTime.UtcNow
+            TimestampUtc = DateTimeOffset.UtcNow
         };
 
         _logger.LogDebug("User {Username} sending message: {Message}", _username, message);
@@ -118,7 +149,7 @@ public sealed class ChatHub : StreamingHubBase<IChatHub, IChatHubReceiver>, ICha
     /// <inheritdoc />
     public async ValueTask ServerPingAsync()
     {
-        var notificationTime = DateTime.UtcNow;
+        var notificationTime = DateTimeOffset.UtcNow;
         _group ??= await Group.AddAsync(Constants.GlobalGroupName);
         
         SendMessagesToGroup(
@@ -148,7 +179,13 @@ public sealed class ChatHub : StreamingHubBase<IChatHub, IChatHubReceiver>, ICha
         {
             throw new InvalidOperationException("Group not initialized");
         }
-        
+
+        var attr = new KeyValuePair<string, object?>("type", message.IsServerMessage ? "system" : "user");
+        MessagesSent.Add(1, attr);
+        MessageBytes.Record(message.Message.Length, attr);
+
+        var sw = Stopwatch.StartNew();
         group.All.OnReceiveMessage(message);
+        BroadcastDuration.Record(sw.Elapsed.TotalMilliseconds, attr);
     }
 }

@@ -1,5 +1,7 @@
 using Chat.Server.Configuration;
 using Chat.Server.Services;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Trace;
 using Serilog;
 using StackExchange.Redis;
 
@@ -52,16 +54,35 @@ try
         builder.Services.AddGrpcReflection();
     }
 
+    // OpenTelemetry metrics and tracing
+    builder.Services.AddOpenTelemetry()
+        .WithMetrics(metrics => metrics
+            .AddAspNetCoreInstrumentation()
+            .AddRuntimeInstrumentation()
+            .AddMeter("Chat.Server"))
+        .WithTracing(tracing => tracing
+            .AddGrpcClientInstrumentation()
+            .AddAspNetCoreInstrumentation()
+            .AddSource("Chat.Server"));
+
     // Background services
     builder.Services.AddHostedService<ServerNotificationService>();
 
-    // Health checks
+    // Health checks — reuse the singleton IConnectionMultiplexer
     builder.Services
         .AddHealthChecks()
         .AddRedis(
-            redisConnectionString,
+            sp => sp.GetRequiredService<IConnectionMultiplexer>(),
             name: "redis",
             tags: ["ready"]);
+
+    // Kestrel connection limits to prevent resource exhaustion
+    builder.WebHost.ConfigureKestrel(options =>
+    {
+        options.Limits.MaxConcurrentConnections = 1000;
+        options.Limits.MaxConcurrentUpgradedConnections = 1000;
+        options.Limits.Http2.MaxStreamsPerConnection = 100;
+    });
 
     var app = builder.Build();
 

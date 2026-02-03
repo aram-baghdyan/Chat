@@ -3,6 +3,7 @@ using Chat.Server.Configuration;
 using Grpc.Net.Client;
 using MagicOnion.Client;
 using Microsoft.Extensions.Options;
+using System.Diagnostics.Metrics;
 
 namespace Chat.Server.Services;
 
@@ -12,6 +13,11 @@ namespace Chat.Server.Services;
 /// </summary>
 public sealed class ServerNotificationService : BackgroundService
 {
+    private static readonly Meter Meter = new("Chat.Server", "1.0.0");
+    private static readonly Counter<long> NotificationErrors =
+        Meter.CreateCounter<long>("chat.notification.errors",
+            description: "Number of notification-loop failures");
+
     private readonly ILogger<ServerNotificationService> _logger;
     private readonly ChatOptions _options;
 
@@ -52,12 +58,19 @@ public sealed class ServerNotificationService : BackgroundService
             }
             catch (Exception ex)
             {
+                NotificationErrors.Add(1);
                 _logger.LogError(ex, "Notification loop failed, reconnecting in 5s");
                 await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
             }
         }
 
         _logger.LogInformation("Server notification service stopped");
+    }
+
+    public override async Task StopAsync(CancellationToken cancellationToken)
+    {
+        _logger.LogInformation("Server notification service shutting down gracefully");
+        await base.StopAsync(cancellationToken);
     }
 
     private async Task RunNotificationLoopAsync(TimeSpan interval, CancellationToken cancellationToken)

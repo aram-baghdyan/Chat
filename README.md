@@ -35,6 +35,8 @@ A scalable, production-ready real-time chat system built with .NET 10 and MagicO
 - **Redis** - Message distribution backplane
 - **Serilog** - Structured logging
 - **MessagePack** - Efficient serialization
+- **OpenTelemetry** - Metrics and distributed tracing
+- **NGINX** - gRPC reverse proxy with rate limiting
 - **Docker & Docker Compose** - Containerization
 
 ## Quick Start
@@ -93,7 +95,22 @@ Server configuration in `src/Chat.Server/appsettings.json`:
 ## Health Checks
 
 - **Liveness:** `http://localhost:5000/health/live`
-- **Readiness:** `http://localhost:5000/health/ready` (checks Redis connectivity)
+- **Readiness:** `http://localhost:5000/health/ready` (checks Redis connectivity, reuses the singleton `IConnectionMultiplexer`)
+
+## Observability
+
+OpenTelemetry is configured with ASP.NET Core, runtime, and gRPC-client instrumentation. The application exposes the following custom metrics from the `Chat.Server` meter:
+
+| Metric | Type | Attributes | Description |
+|---|---|---|---|
+| `chat.connections.active` | UpDownCounter | — | Currently connected users |
+| `chat.joins.total` | Counter | `outcome`: `success` / `rejected` | Join attempts |
+| `chat.messages.sent` | Counter | `type`: `user` / `system` | Messages broadcast |
+| `chat.messages.bytes` | Histogram | `type`: `user` / `system` | Broadcast payload sizes (bytes) |
+| `chat.group.broadcast.duration` | Histogram | `type`: `user` / `system` | Redis group broadcast latency (ms) |
+| `chat.notification.errors` | Counter | — | `ServerNotificationService` loop failures |
+
+No exporter is wired by default. Add one (OTLP, Prometheus, Console) through the `.WithMetrics()` / `.WithTracing()` builders in `Program.cs`.
 
 ## Project Structure
 
@@ -155,28 +172,29 @@ When `registerAsDefault: true`:
 
 ✅ **Implemented:**
 - Structured logging with Serilog
-- Health checks (liveness and readiness)
+- Health checks (liveness and readiness, Redis reuses singleton connection)
 - Message serialization with MessagePack
 - Multi-instance support via MagicOnion Redis backplane
 - Docker health checks
+- OpenTelemetry metrics and tracing (application metrics, ASP.NET Core, runtime, gRPC client)
+- NGINX rate limiting (100 req/s per IP, burst 50)
+- Kestrel connection limits (1 000 concurrent connections, 100 HTTP/2 streams per connection)
+- Graceful shutdown in `ServerNotificationService`
+- `DateTimeOffset` timestamps for round-trip-safe MessagePack serialization
 
-⚠️ **Pending Code Review Fixes:**
-- Resource disposal in `ServerNotificationService`
+⚠️ **Pending:**
 - Reconnection logic for background services
 - Fire-and-forget hub methods (`void` returns)
-- Message ID for idempotency
 
 See [docs/next-steps.md](docs/next-steps.md) for detailed findings.
 
 🔜 **Consider for production:**
 - Authentication & authorization
 - Message persistence (database)
-- Rate limiting
 - Message history
 - User presence tracking
 - TLS/SSL certificates
-- Monitoring & metrics (Prometheus)
-- Distributed tracing (OpenTelemetry)
+- OTel exporter (OTLP, Prometheus, etc.) — instrumentation is wired, exporter is not
 
 ## License
 

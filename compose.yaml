@@ -24,7 +24,7 @@ services:
       dockerfile: src/Chat.Server/Dockerfile
     # No ports exposed - accessed via nginx only
     environment:
-      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_ENVIRONMENT=Production
       - ASPNETCORE_URLS=http://+:8080
       - Redis__ConnectionString=redis:6379,abortConnect=false
       - Chat__ServerNotificationIntervalSeconds=30

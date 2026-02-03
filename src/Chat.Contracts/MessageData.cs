@@ -36,5 +36,5 @@ public sealed record MessageData
     /// UTC timestamp when the message was created.
     /// </summary>
     [Key(4)]
-    public required DateTime TimestampUtc { get; init; }
+    public required DateTimeOffset TimestampUtc { get; init; }
 }

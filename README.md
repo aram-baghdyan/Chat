@@ -103,27 +103,46 @@ Chat/
 │   ├── Chat.Contracts/          # Shared interfaces and models
 │   │   ├── IChatHub.cs         # Hub interface
 │   │   ├── IChatHubReceiver.cs # Client receiver interface
-│   │   └── MessageData.cs      # Message model
+│   │   ├── MessageData.cs      # Message model
+│   │   └── Constants.cs        # Shared constants
 │   ├── Chat.Server/            # Server application
 │   │   ├── Hubs/
 │   │   │   └── ChatHub.cs      # Hub implementation
 │   │   ├── Services/
-│   │   │   ├── IRedisMessageBus.cs
-│   │   │   ├── RedisMessageBus.cs
-│   │   │   ├── MessageBroadcaster.cs
-│   │   │   └── ServerNotificationService.cs
+│   │   │   └── ServerNotificationService.cs  # Periodic notifications
 │   │   ├── Configuration/
-│   │   │   └── ChatOptions.cs
-│   │   ├── Program.cs
+│   │   │   └── ChatOptions.cs  # App configuration
+│   │   ├── NoOpReceiver.cs     # Dummy receiver for server-side hub client
+│   │   ├── Program.cs          # App entry point
 │   │   ├── appsettings.json
 │   │   └── Dockerfile
 │   └── Chat.Client/            # Console client
 │       ├── Program.cs
+│       ├── ChatReceiver.cs     # Message receiver implementation
 │       └── Dockerfile
 ├── docs/                       # Documentation
+│   ├── next-steps.md          # Roadmap and code review findings
+│   └── plans/                 # Implementation plans
 ├── compose.yaml               # Docker Compose orchestration
 └── Chat.slnx                  # Solution file
 ```
+
+## How Multi-Server Works
+
+MagicOnion 7.x uses the **Multicaster** library for Redis-based group distribution:
+
+```csharp
+// Program.cs - Enable Redis backplane
+builder.Services.AddMagicOnion()
+    .UseRedisGroup(
+        config => config.ConnectionString = redisConnectionString,
+        registerAsDefault: true);  // Critical: must be true for cross-server
+```
+
+When `registerAsDefault: true`:
+1. All `group.All.OnReceiveMessage()` calls are published to Redis
+2. All server instances subscribe to the same Redis channel
+3. Each server broadcasts to its local clients
 
 ## Testing Multi-Instance Setup
 
@@ -137,12 +156,17 @@ Chat/
 ✅ **Implemented:**
 - Structured logging with Serilog
 - Health checks (liveness and readiness)
-- Graceful shutdown handling
-- Connection retry logic
-- Bounded channels for backpressure
 - Message serialization with MessagePack
-- Multi-instance support via Redis
+- Multi-instance support via MagicOnion Redis backplane
 - Docker health checks
+
+⚠️ **Pending Code Review Fixes:**
+- Resource disposal in `ServerNotificationService`
+- Reconnection logic for background services
+- Fire-and-forget hub methods (`void` returns)
+- Message ID for idempotency
+
+See [docs/next-steps.md](docs/next-steps.md) for detailed findings.
 
 🔜 **Consider for production:**
 - Authentication & authorization

@@ -29,6 +29,7 @@ services:
       - Redis__ConnectionString=redis:6379,abortConnect=false
       - Chat__ServerNotificationIntervalSeconds=30
       - Chat__EnableServerNotifications=true
+      - Chat__MaxHistoryMessages=100
     depends_on:
       redis:
         condition: service_healthy

@@ -37,4 +37,10 @@ public sealed class ChatOptions
     /// </summary>
     [Range(1, 10000)]
     public int MaxMessageLength { get; init; } = 4000;
+
+    /// <summary>
+    /// Maximum number of messages to retain in history.
+    /// </summary>
+    [Range(1, 1000)]
+    public int MaxHistoryMessages { get; init; } = 100;
 }

@@ -1,5 +1,6 @@
 using Chat.Contracts;
 using Chat.Server.Configuration;
+using Chat.Server.Services;
 using MagicOnion.Server.Hubs;
 using Microsoft.Extensions.Options;
 using System.Diagnostics;
@@ -39,14 +40,19 @@ public sealed class ChatHub : StreamingHubBase<IChatHub, IChatHubReceiver>, ICha
 
     private readonly ChatOptions _options;
     private readonly ILogger<ChatHub> _logger;
+    private readonly ChatHistoryService _historyService;
     private string? _username;
-    private bool _isJoined = false;
+    private bool _isJoined;
     private IGroup<IChatHubReceiver>? _group;
 
-    public ChatHub(IOptions<ChatOptions> options, ILogger<ChatHub> logger)
+    public ChatHub(
+        IOptions<ChatOptions> options,
+        ILogger<ChatHub> logger,
+        ChatHistoryService historyService)
     {
         _options = options.Value;
         _logger = logger;
+        _historyService = historyService;
     }
 
     /// <inheritdoc />
@@ -117,7 +123,7 @@ public sealed class ChatHub : StreamingHubBase<IChatHub, IChatHubReceiver>, ICha
     }
 
     /// <inheritdoc />
-    public ValueTask SendMessageAsync(string message)
+    public async ValueTask SendMessageAsync(string message)
     {
         if (!_isJoined || _username is null)
         {
@@ -128,7 +134,14 @@ public sealed class ChatHub : StreamingHubBase<IChatHub, IChatHubReceiver>, ICha
         if (string.IsNullOrWhiteSpace(message))
         {
             _logger.LogDebug("User {Username} sent empty message", _username);
-            return ValueTask.CompletedTask;
+            return;
+        }
+
+        if (message.Length > _options.MaxMessageLength)
+        {
+            _logger.LogWarning("User {Username} attempted to send message exceeding max length ({Length} > {MaxLength})",
+                _username, message.Length, _options.MaxMessageLength);
+            throw new ArgumentException($"Message cannot exceed {_options.MaxMessageLength} characters", nameof(message));
         }
 
         var messageData = new MessageData
@@ -141,9 +154,11 @@ public sealed class ChatHub : StreamingHubBase<IChatHub, IChatHubReceiver>, ICha
 
         _logger.LogDebug("User {Username} sending message: {Message}", _username, message);
 
+        // Broadcast to all clients
         SendMessagesToGroup(_group, messageData);
-        
-        return ValueTask.CompletedTask;
+
+        // Save to history (fire-and-forget, non-critical)
+        await _historyService.SaveMessageAsync(Constants.GlobalGroupName, messageData);
     }
 
     /// <inheritdoc />
@@ -151,7 +166,7 @@ public sealed class ChatHub : StreamingHubBase<IChatHub, IChatHubReceiver>, ICha
     {
         var notificationTime = DateTimeOffset.UtcNow;
         _group ??= await Group.AddAsync(Constants.GlobalGroupName);
-        
+
         SendMessagesToGroup(
             _group,
             new MessageData
@@ -161,6 +176,12 @@ public sealed class ChatHub : StreamingHubBase<IChatHub, IChatHubReceiver>, ICha
                 TimestampUtc = notificationTime,
                 IsServerMessage = true,
             });
+    }
+
+    /// <inheritdoc />
+    public async Task<MessageData[]> GetHistoryAsync()
+    {
+        return await _historyService.GetHistoryAsync(Constants.GlobalGroupName);
     }
 
     protected override async ValueTask OnDisconnected()

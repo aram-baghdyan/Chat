@@ -25,7 +25,13 @@ public interface IChatHub : IStreamingHub<IChatHub, IChatHubReceiver>
     ValueTask SendMessageAsync(string message);
 
     /// <summary>
-    /// Broadcasts a message to all connected clients.
+    /// Broadcasts a server ping to all connected clients.
     /// </summary>
     ValueTask ServerPingAsync();
+
+    /// <summary>
+    /// Gets recent chat history (user messages only).
+    /// </summary>
+    /// <returns>Array of recent messages, oldest first (chronological).</returns>
+    Task<MessageData[]> GetHistoryAsync();
 }

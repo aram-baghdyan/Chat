@@ -130,6 +130,19 @@ public sealed class ChatClient : IAsyncDisposable
     }
 
     /// <summary>
+    /// Gets recent chat history (user messages only, oldest first).
+    /// </summary>
+    public async Task<MessageData[]> GetHistoryAsync(CancellationToken ct = default)
+    {
+        if (_hub is null || State != ConnectionState.Connected)
+        {
+            throw new InvalidOperationException("Not connected to server");
+        }
+
+        return await _hub.GetHistoryAsync();
+    }
+
+    /// <summary>
     /// Leaves the chat gracefully.
     /// </summary>
     public async Task LeaveAsync()

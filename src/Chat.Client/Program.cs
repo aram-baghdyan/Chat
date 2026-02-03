@@ -47,6 +47,18 @@ try
     // Connect with retry
     await client.ConnectWithRetryAsync(username, cts.Token);
 
+    // Fetch and display chat history
+    var history = await client.GetHistoryAsync(cts.Token);
+    if (history.Length > 0)
+    {
+        ConsoleUI.WriteInfo($"--- Last {history.Length} messages ---");
+        foreach (var msg in history)
+        {
+            receiver.OnReceiveMessage(msg);
+        }
+        ConsoleUI.WriteSeparator();
+    }
+
     ConsoleUI.WriteSuccess("Connected! Type your messages (or 'exit' to quit):");
     ConsoleUI.WriteSeparator();
 

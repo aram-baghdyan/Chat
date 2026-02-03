@@ -38,6 +38,9 @@ try
         return ConnectionMultiplexer.Connect(options);
     });
 
+    // Chat history service
+    builder.Services.AddSingleton<ChatHistoryService>();
+
     // MagicOnion gRPC services
     builder.Services.AddGrpc(options =>
     {

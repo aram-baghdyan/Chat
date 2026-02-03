@@ -1,8 +1,9 @@
 services:
   redis:
     image: redis:7-alpine
-    ports:
-      - "6379:6379"
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -10,14 +11,18 @@ services:
       retries: 5
     networks:
       - chat-network
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    restart: unless-stopped
 
   chat.server:
     image: local/chat.server
     build:
       context: .
       dockerfile: src/Chat.Server/Dockerfile
-    ports:
-      - "5000:8080"
+    # No ports exposed - accessed via nginx only
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_URLS=http://+:8080
@@ -35,36 +40,44 @@ services:
       start_period: 10s
     networks:
       - chat-network
+    deploy:
+      mode: replicated
+      replicas: 2
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
     restart: unless-stopped
 
-  chat.server.2:
-    image: local/chat.server
-    build:
-      context: .
-      dockerfile: src/Chat.Server/Dockerfile
+  nginx:
+    image: nginx:1.27-alpine
     ports:
-      - "5001:8080"
-    environment:
-      - ASPNETCORE_ENVIRONMENT=Development
-      - ASPNETCORE_URLS=http://+:8080
-      - Redis__ConnectionString=redis:6379,abortConnect=false
-      - Chat__ServerNotificationIntervalSeconds=30
-      - Chat__EnableServerNotifications=false
+      - "5000:8080"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
     depends_on:
-      redis:
-        condition: service_healthy
       chat.server:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "curl -f --http2-prior-knowledge http://localhost:8080/health/ready || exit 1"]
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:8080/nginx-health || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 3
-      start_period: 10s
     networks:
       - chat-network
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 128M
     restart: unless-stopped
 
 networks:
   chat-network:
     driver: bridge
+
+volumes:
+  redis_data:

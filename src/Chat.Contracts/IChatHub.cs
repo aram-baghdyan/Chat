@@ -11,25 +11,21 @@ public interface IChatHub : IStreamingHub<IChatHub, IChatHubReceiver>
     /// Joins the chat with the specified username.
     /// </summary>
     /// <param name="username">The username to join with.</param>
-    /// <param name="cancellationToken">Cancellation token for operation</param>
-    Task JoinAsync(string username, CancellationToken cancellationToken = default);
+    Task JoinAsync(string username);
 
     /// <summary>
     /// Leaves the chat and disconnects.
     /// </summary>
-    /// <param name="cancellationToken">Cancellation token for operation</param>
-    ValueTask LeaveAsync(CancellationToken cancellationToken = default);
+    ValueTask LeaveAsync();
 
     /// <summary>
     /// Sends a message to all connected clients.
     /// </summary>
     /// <param name="message">The message text to send.</param>
-    /// <param name="cancellationToken">Cancellation token for operation</param>
-    ValueTask SendMessageAsync(string message, CancellationToken cancellationToken = default);
+    ValueTask SendMessageAsync(string message);
 
     /// <summary>
     /// Broadcasts a message to all connected clients.
     /// </summary>
-    /// <param name="cancellationToken">Cancellation token for operation</param>
-    ValueTask ServerPingAsync(CancellationToken cancellationToken = default);
+    ValueTask ServerPingAsync();
 }

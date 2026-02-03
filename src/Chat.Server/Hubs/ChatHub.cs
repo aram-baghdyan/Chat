@@ -20,7 +20,7 @@ public sealed class ChatHub : StreamingHubBase<IChatHub, IChatHubReceiver>, ICha
     }
 
     /// <inheritdoc />
-    public async Task JoinAsync(string username, CancellationToken cancellationToken = default)
+    public async Task JoinAsync(string username)
     {
         if (string.IsNullOrWhiteSpace(username))
         {
@@ -49,9 +49,8 @@ public sealed class ChatHub : StreamingHubBase<IChatHub, IChatHubReceiver>, ICha
         _group.All.OnReceiveMessage(joinMessage);
     }
 
-    /// <param name="cancellationToken"></param>
     /// <inheritdoc />
-    public ValueTask LeaveAsync(CancellationToken cancellationToken = default)
+    public ValueTask LeaveAsync()
     {
         if (!_isJoined)
         {
@@ -76,7 +75,7 @@ public sealed class ChatHub : StreamingHubBase<IChatHub, IChatHubReceiver>, ICha
     }
 
     /// <inheritdoc />
-    public ValueTask SendMessageAsync(string message, CancellationToken cancellationToken = default)
+    public ValueTask SendMessageAsync(string message)
     {
         if (!_isJoined || _username is null)
         {
@@ -106,20 +105,20 @@ public sealed class ChatHub : StreamingHubBase<IChatHub, IChatHubReceiver>, ICha
     }
 
     /// <inheritdoc />
-    public ValueTask ServerPingAsync(CancellationToken cancellationToken = default)
+    public async ValueTask ServerPingAsync()
     {
         var notificationTime = DateTime.UtcNow;
+        _group ??= await Group.AddAsync(Constants.GlobalGroupName);
+        
         SendMessagesToGroup(
             _group,
             new MessageData
             {
+                Username = $"SERVER:{Environment.MachineName}",
                 Message = $"Server time: {notificationTime:yyyy-MM-dd HH:mm:ss} UTC",
                 TimestampUtc = notificationTime,
                 IsServerMessage = true,
-                Username = "[SERVER]"
             });
-        
-        return ValueTask.CompletedTask;
     }
 
     protected override async ValueTask OnDisconnected()

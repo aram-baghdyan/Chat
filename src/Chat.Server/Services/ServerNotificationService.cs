@@ -75,7 +75,7 @@ public sealed class ServerNotificationService : BackgroundService
             using var timer = new PeriodicTimer(interval);                                                                                                                                                           
             while (await timer.WaitForNextTickAsync(cancellationToken))                                                                                                                                                  
             {   
-                hub.ServerPingAsync();
+                await hub.ServerPingAsync();
             }
         }
         finally

@@ -14,7 +14,7 @@ sealed class ChatReceiver : IChatHubReceiver
             // Server messages with prefix
             var color = Console.ForegroundColor;
             Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.WriteLine($"[{timestamp}] [SERVER]: {message.Message}");
+            Console.WriteLine($"[{timestamp}] [{message.Username}]: {message.Message}");
             Console.ForegroundColor = color;
         }
         else

@@ -1,6 +1,7 @@
 using Chat.Server.Configuration;
 using Chat.Server.Services;
 using OpenTelemetry.Metrics;
+using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 using Serilog;
 using StackExchange.Redis;
@@ -55,15 +56,22 @@ try
     }
 
     // OpenTelemetry metrics and tracing
-    builder.Services.AddOpenTelemetry()
-        .WithMetrics(metrics => metrics
-            .AddAspNetCoreInstrumentation()
-            .AddRuntimeInstrumentation()
-            .AddMeter("Chat.Server"))
-        .WithTracing(tracing => tracing
-            .AddGrpcClientInstrumentation()
-            .AddAspNetCoreInstrumentation()
-            .AddSource("Chat.Server"));
+    builder.Services.AddOpenTelemetry()                                                                                                                                                                      
+      .ConfigureResource(resource => resource                                                                                                                                                              
+          .AddService(                                                                                                                                                                                     
+              serviceName: "Chat.Server",                                                                                                                                                                  
+              serviceVersion: "1.0.0",                                                                                                                                                                     
+              serviceInstanceId: Environment.MachineName))                                                                                                                                                 
+      .WithTracing(tracing => tracing                                                                                                                                                                      
+          .AddAspNetCoreInstrumentation()                                                                                                                                                                  
+          .AddGrpcClientInstrumentation()                                                                                                                                                                  
+          .AddSource("Chat.Server")       // Custom traces                                                                                                                                                 
+          .AddConsoleExporter())                                                                                                                                                                           
+      .WithMetrics(metrics => metrics                                                                                                                                                                      
+          .AddAspNetCoreInstrumentation()                                                                                                                                                                  
+          .AddRuntimeInstrumentation()    // GC, ThreadPool, etc.                                                                                                                                          
+          .AddMeter("Chat.Server")        // Custom metrics                                                                                                                                                
+          .AddConsoleExporter()); 
 
     // Background services
     builder.Services.AddHostedService<ServerNotificationService>();

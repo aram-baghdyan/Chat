@@ -1,111 +1,127 @@
-using Chat.Contracts;
+using Chat.Client;
+using Chat.Client.Configuration;
 using Grpc.Core;
-using Grpc.Net.Client;
-using MagicOnion.Client;
 
 // Allow HTTP/2 without TLS (required for gRPC without HTTPS)
 AppContext.SetSwitch("System.Net.Http.SocketsHttpHandler.Http2UnencryptedSupport", true);
 
-Console.WriteLine("=== MagicOnion Chat Client ===");
-Console.WriteLine();
+var options = new ClientOptions();
+var cts = new CancellationTokenSource();
+
+// Handle Ctrl+C gracefully
+Console.CancelKeyPress += (_, e) =>
+{
+    e.Cancel = true;
+    cts.Cancel();
+};
+
+ConsoleUI.WriteHeader();
 
 // Get server address
-Console.Write("Enter server address (press Enter for localhost:5000): ");
-var serverAddress = Console.ReadLine();
-if (string.IsNullOrWhiteSpace(serverAddress))
+var serverAddress = ConsoleUI.PromptForInput("Enter server address", options.DefaultServerAddress)
+    ?? options.DefaultServerAddress;
+
+// Ensure http:// prefix
+if (!serverAddress.StartsWith("http://", StringComparison.OrdinalIgnoreCase) &&
+    !serverAddress.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
 {
-    serverAddress = "http://localhost:5000";
+    serverAddress = $"http://{serverAddress}";
 }
 
 // Get username
-Console.Write("Enter your username: ");
-var username = Console.ReadLine();
-while (string.IsNullOrWhiteSpace(username))
-{
-    Console.WriteLine("Username cannot be empty!");
-    Console.Write("Enter your username: ");
-    username = Console.ReadLine();
-}
+var username = ConsoleUI.PromptForRequiredInput("Enter your username");
 
 Console.WriteLine();
-Console.WriteLine($"Connecting to {serverAddress} as {username}...");
+ConsoleUI.WriteInfo($"Connecting to {serverAddress} as {username}...");
 
-var cts = new CancellationTokenSource();
-Console.CancelKeyPress += async (_, e) =>                                                                                                                                                                
-{                                                                                                                                                                                                        
-    e.Cancel = true;                                                                                                                                                                                     
-    await cts.CancelAsync();                                                                                                                                                                             
-};  
+// Create receiver and client
+var receiver = new ChatReceiver();
+await using var client = new ChatClient(serverAddress, receiver, options);
+
+// Subscribe to events
+client.StateChanged += ConsoleUI.WriteConnectionState;
+client.OnError += ConsoleUI.WriteError;
 
 try
 {
-    // Create gRPC channel (HTTP/2 without TLS)
-    var channel = GrpcChannel.ForAddress(serverAddress, new GrpcChannelOptions
-    {
-        MaxReceiveMessageSize = 4 * 1024 * 1024,
-        MaxSendMessageSize = 4 * 1024 * 1024
-    });
+    // Connect with retry
+    await client.ConnectWithRetryAsync(username, cts.Token);
 
-    // Create receiver
-    var receiver = new ChatReceiver();
-    
-    // Connect to hub
-    var hub = await StreamingHubClient.ConnectAsync<IChatHub, IChatHubReceiver>(
-        channel,
-        receiver);
+    ConsoleUI.WriteSuccess("Connected! Type your messages (or 'exit' to quit):");
+    ConsoleUI.WriteSeparator();
 
-    Console.WriteLine("Connected! Type your messages (or 'exit' to quit):");
-    Console.WriteLine(new string('-', 60));
-    
-    // Join chat
-    await hub.JoinAsync(username);
+    // Message input loop
+    await RunMessageLoopAsync(client, options, cts.Token);
 
-    // Start message reading loop
-    var readTask = Task.Run(async () =>
-    {
-        while (!cts.Token.IsCancellationRequested)
-        {
-            try
-            {
-                var input = Console.ReadLine();
-
-                if (string.IsNullOrEmpty(input))
-                {
-                    continue;
-                }
-
-                if (input.Equals("exit", StringComparison.OrdinalIgnoreCase))
-                {
-                    await cts.CancelAsync();
-                    break;
-                }
-
-                hub.SendMessageAsync(input);
-            }
-            catch (Exception ex) when (ex is not OperationCanceledException)
-            {
-                Console.WriteLine($"Error sending message: {ex.Message}");
-            }
-        }
-    }, cts.Token);
-
-    // Wait for exit
-    await readTask;
-
-    // Leave chat
-    await hub.LeaveAsync();
-    await hub.DisposeAsync();
-    await channel.ShutdownAsync();
-
-    Console.WriteLine("Disconnected. Press any key to exit...");
-    Console.ReadKey();
+    ConsoleUI.WriteInfo("Leaving chat...");
+}
+catch (OperationCanceledException)
+{
+    ConsoleUI.WriteInfo("Disconnecting...");
+}
+catch (InvalidOperationException ex)
+{
+    ConsoleUI.WriteError(ex.Message);
 }
 catch (RpcException ex)
 {
-    Console.WriteLine($"Connection error: {ex.Status.Detail}");
-    Console.WriteLine("Make sure the server is running and accessible.");
+    ConsoleUI.WriteError($"Connection error: {ex.Status.Detail}");
+    ConsoleUI.WriteInfo("Make sure the server is running and accessible.");
 }
 catch (Exception ex)
 {
-    Console.WriteLine($"Unexpected error: {ex.Message}");
+    ConsoleUI.WriteError($"Unexpected error: {ex.Message}");
+}
+
+ConsoleUI.WriteInfo("Press any key to exit...");
+Console.ReadKey(intercept: true);
+
+return;
+
+static async Task RunMessageLoopAsync(ChatClient client, ClientOptions options, CancellationToken ct)
+{
+    while (!ct.IsCancellationRequested && client.IsConnected)
+    {
+        try
+        {
+            // Non-blocking input check
+            if (!Console.KeyAvailable)
+            {
+                await Task.Delay(50, ct);
+                continue;
+            }
+
+            var input = Console.ReadLine();
+
+            if (string.IsNullOrWhiteSpace(input))
+            {
+                continue;
+            }
+
+            if (input.Equals(options.ExitCommand, StringComparison.OrdinalIgnoreCase))
+            {
+                break;
+            }
+
+            if (!client.IsConnected)
+            {
+                ConsoleUI.WriteWarning("Not connected. Message not sent.");
+                continue;
+            }
+
+            await client.SendMessageAsync(input, ct);
+        }
+        catch (RpcException ex) when (ex.StatusCode == StatusCode.Unavailable)
+        {
+            ConsoleUI.WriteWarning("Connection lost. Attempting to reconnect...");
+        }
+        catch (OperationCanceledException)
+        {
+            break;
+        }
+        catch (Exception ex)
+        {
+            ConsoleUI.WriteError($"Error sending message: {ex.Message}");
+        }
+    }
 }

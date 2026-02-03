@@ -1,9 +1,12 @@
-﻿using Chat.Contracts;
+using Chat.Client;
+using Chat.Contracts;
+
+namespace Chat.Client;
 
 /// <summary>
 /// Receives and displays messages from the server.
 /// </summary>
-sealed class ChatReceiver : IChatHubReceiver
+public sealed class ChatReceiver : IChatHubReceiver
 {
     public void OnReceiveMessage(MessageData message)
     {
@@ -11,16 +14,11 @@ sealed class ChatReceiver : IChatHubReceiver
 
         if (message.IsServerMessage)
         {
-            // Server messages with prefix
-            var color = Console.ForegroundColor;
-            Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.WriteLine($"[{timestamp}] [{message.Username}]: {message.Message}");
-            Console.ForegroundColor = color;
+            ConsoleUI.WriteSystemMessage(timestamp, message.Username, message.Message);
         }
         else
         {
-            // Regular user messages
-            Console.WriteLine($"[{timestamp}] {message.Username}: {message.Message}");
+            ConsoleUI.WriteUserMessage(timestamp, message.Username, message.Message);
         }
     }
 }

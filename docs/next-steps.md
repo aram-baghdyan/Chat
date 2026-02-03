@@ -2,7 +2,7 @@
 
 > **Current Status:** ✅ Production-ready MVP complete
 >
-> **Last Updated:** 2026-02-02
+> **Last Updated:** 2026-02-03
 
 ---
 
@@ -13,14 +13,15 @@
 **Goal:** Ensure reliability and catch edge cases
 
 - [ ] **Unit Tests** - Test individual components
-  - `RedisMessageBus` serialization/deserialization
-  - `ChatHub` join/leave/send logic
-  - `MessageBroadcaster` callback handling
+  - `ChatHub` join/leave/send/history logic
+  - `ChatHistoryService` save and retrieve (MessagePack round-trip)
   - `ServerNotificationService` timing and cancellation
+  - `ChatClient` connection-state machine and reconnect paths
 
 - [ ] **Integration Tests** - Test component interactions
   - Client-server connection flow
   - Message distribution across instances
+  - Chat history persistence and replay on reconnect
   - Redis failover behavior
   - Health check endpoints
 
@@ -73,10 +74,10 @@
   - Entity Framework Core
   - Message indexing for search
 
-- [ ] **Message History API**
-  - Fetch last N messages on join
-  - Pagination support
-  - Filter by date/user
+- [x] **Message History API** (basic — Redis list, replayed on join)
+  - [x] Fetch last N messages on join
+  - [ ] Pagination support
+  - [ ] Filter by date/user
 
 - [ ] **Audit Logging**
   - Track user actions
@@ -162,16 +163,16 @@ CREATE TABLE Messages (
 
 **Goal:** Production operational excellence
 
-- [ ] **Metrics (Prometheus)**
-  - Message throughput
-  - Active connections
-  - Redis latency
-  - Hub method timings
+- [x] **Metrics** (OTel — console exporter; swap for Prometheus when ready)
+  - [x] Message throughput (`chat.messages.sent`)
+  - [x] Active connections (`chat.connections.active`)
+  - [x] Redis latency (`chat.group.broadcast.duration`)
+  - [x] Hub method timings (ASP.NET Core instrumentation)
 
-- [ ] **Distributed Tracing (OpenTelemetry)**
-  - Request tracing across services
-  - Jaeger/Zipkin integration
-  - Performance bottleneck identification
+- [x] **Distributed Tracing (OpenTelemetry)**
+  - [x] Request tracing across services (ASP.NET Core + gRPC client instrumentation)
+  - [ ] Jaeger/Zipkin/OTLP exporter (currently console only)
+  - [x] Performance bottleneck identification
 
 - [ ] **Application Insights / Elastic APM**
   - Full observability stack
@@ -189,22 +190,23 @@ CREATE TABLE Messages (
 
 **Goal:** Prevent abuse and secure the system
 
-- [ ] **Rate Limiting**
-  - Message rate limits per user
-  - Connection rate limiting
-  - Distributed rate limiting (Redis)
+- [x] **Rate Limiting** (connection-level via NGINX)
+  - [ ] Message rate limits per user
+  - [x] Connection rate limiting (NGINX `limit_req_zone`, 100 req/s per IP)
+  - [ ] Distributed rate limiting (Redis)
 
-- [ ] **Input Validation**
-  - XSS prevention
-  - SQL injection protection
-  - Message length limits
-  - Username validation
+- [x] **Input Validation**
+  - [ ] XSS prevention
+  - [ ] SQL injection protection
+  - [x] Message length limits (server-side, `MaxMessageLength`)
+  - [x] Username validation (length + empty check)
 
 - [ ] **Security Hardening**
-  - TLS/SSL certificates
-  - CORS configuration
-  - Content Security Policy
-  - DDoS protection
+  - [x] Kestrel connection limits (1 000 concurrent, 100 HTTP/2 streams)
+  - [ ] TLS/SSL certificates
+  - [ ] CORS configuration
+  - [ ] Content Security Policy
+  - [ ] DDoS protection
 
 - [ ] **Moderation Tools**
   - Ban/mute users
@@ -295,10 +297,9 @@ CREATE TABLE Messages (
 
 ### Items to Address
 
-- [ ] **MessageBroadcaster Pattern**
-  - Current callback pattern works but consider alternatives
-  - Investigate MagicOnion 7.x group access patterns
-  - Evaluate using IGroupRepository directly
+- [x] **MessageBroadcaster Pattern**
+  - Migrated to MagicOnion 7.x built-in Redis groups (`UseRedisGroup`)
+  - All broadcasts route through the `SendMessagesToGroup` helper
 
 - [ ] **Configuration Management**
   - Centralize configuration validation
@@ -391,12 +392,12 @@ CREATE TABLE Messages (
 ### Must Have (P0)
 1. Unit & Integration Tests
 2. Authentication/Authorization
-3. Rate Limiting
-4. Security Hardening
+3. ~~Rate Limiting~~ — connection-level done (NGINX); per-user pending
+4. ~~Security Hardening~~ — Kestrel limits done; TLS/CORS pending
 
 ### Should Have (P1)
-5. Message Persistence
-6. Monitoring & Metrics
+5. ~~Message Persistence~~ — basic Redis history done; durable DB pending
+6. ~~Monitoring & Metrics~~ — OTel instrumentation + console exporter done
 7. Channels/Rooms
 8. Web Client (Blazor)
 
@@ -444,6 +445,18 @@ CREATE TABLE Messages (
 ---
 
 ## Notes & Decisions
+
+### 2026-02-03 - Production Hardening & History Feature
+- Redis health check reuses singleton `IConnectionMultiplexer`
+- OpenTelemetry wired: ASP.NET Core, runtime, gRPC client instrumentation + console exporter
+- Six custom application metrics added (`chat.*`)
+- NGINX rate limiting and Kestrel connection limits in place
+- `ServerNotificationService` graceful shutdown and reconnection loop
+- `DateTimeOffset` across `MessageData` for safe MessagePack round-trips
+- Redis-backed chat history (`ChatHistoryService`): LPUSH+LTRIM, replayed on client connect
+- Server-side message-length validation added to `SendMessageAsync`
+- Client refactored: `ChatClient` (state machine, auto-reconnect), `ConsoleUI` (thread-safe coloured output), `ClientOptions`
+- Client Dockerfile fixed to copy centralized package props
 
 ### 2026-02-02 - Initial Roadmap Created
 - Focused on testing and security as immediate priorities

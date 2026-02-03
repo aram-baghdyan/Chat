@@ -9,6 +9,7 @@ A scalable, production-ready real-time chat system built with .NET 10 and MagicO
 - **Production-ready** with structured logging, health checks, and graceful shutdown
 - **Server-initiated notifications** demonstrating push capability
 - **Multi-instance support** - messages distributed across all server instances
+- **Chat history** — last N messages replayed on connect, backed by Redis
 - **Docker-ready** with Docker Compose orchestration
 
 ## Architecture
@@ -87,7 +88,11 @@ Server configuration in `src/Chat.Server/appsettings.json`:
   },
   "Chat": {
     "ServerNotificationIntervalSeconds": 30,
-    "EnableServerNotifications": true
+    "EnableServerNotifications": true,
+    "ServerAddress": "http://localhost:8080",
+    "MaxUsernameLength": 50,
+    "MaxMessageLength": 4000,
+    "MaxHistoryMessages": 100
   }
 }
 ```
@@ -110,7 +115,7 @@ OpenTelemetry is configured with ASP.NET Core, runtime, and gRPC-client instrume
 | `chat.group.broadcast.duration` | Histogram | `type`: `user` / `system` | Redis group broadcast latency (ms) |
 | `chat.notification.errors` | Counter | — | `ServerNotificationService` loop failures |
 
-No exporter is wired by default. Add one (OTLP, Prometheus, Console) through the `.WithMetrics()` / `.WithTracing()` builders in `Program.cs`.
+The console exporter is enabled by default. Swap it for OTLP or Prometheus in the `.WithMetrics()` / `.WithTracing()` builders in `Program.cs`.
 
 ## Project Structure
 
@@ -126,7 +131,8 @@ Chat/
 │   │   ├── Hubs/
 │   │   │   └── ChatHub.cs      # Hub implementation
 │   │   ├── Services/
-│   │   │   └── ServerNotificationService.cs  # Periodic notifications
+│   │   │   ├── ServerNotificationService.cs  # Periodic notifications
+│   │   │   └── ChatHistoryService.cs         # Redis-backed message history
 │   │   ├── Configuration/
 │   │   │   └── ChatOptions.cs  # App configuration
 │   │   ├── NoOpReceiver.cs     # Dummy receiver for server-side hub client
@@ -134,8 +140,12 @@ Chat/
 │   │   ├── appsettings.json
 │   │   └── Dockerfile
 │   └── Chat.Client/            # Console client
-│       ├── Program.cs
+│       ├── ChatClient.cs       # Connection lifecycle and auto-reconnect
+│       ├── ConsoleUI.cs        # Thread-safe coloured console output
 │       ├── ChatReceiver.cs     # Message receiver implementation
+│       ├── Configuration/
+│       │   └── ClientOptions.cs  # Client configuration
+│       ├── Program.cs
 │       └── Dockerfile
 ├── docs/                       # Documentation
 │   ├── next-steps.md          # Roadmap and code review findings
@@ -176,25 +186,23 @@ When `registerAsDefault: true`:
 - Message serialization with MessagePack
 - Multi-instance support via MagicOnion Redis backplane
 - Docker health checks
-- OpenTelemetry metrics and tracing (application metrics, ASP.NET Core, runtime, gRPC client)
+- OpenTelemetry metrics and tracing with console exporter (application metrics, ASP.NET Core, runtime, gRPC client)
 - NGINX rate limiting (100 req/s per IP, burst 50)
 - Kestrel connection limits (1 000 concurrent connections, 100 HTTP/2 streams per connection)
-- Graceful shutdown in `ServerNotificationService`
+- Graceful shutdown in `ServerNotificationService` with reconnection loop
 - `DateTimeOffset` timestamps for round-trip-safe MessagePack serialization
+- Redis-backed chat history (`LPUSH`+`LTRIM`, configurable cap, replayed on connect)
+- Server-side message-length validation
+- Client auto-reconnect with configurable retry (`MaxReconnectAttempts`)
 
-⚠️ **Pending:**
-- Reconnection logic for background services
-- Fire-and-forget hub methods (`void` returns)
-
-See [docs/next-steps.md](docs/next-steps.md) for detailed findings.
+See [docs/next-steps.md](docs/next-steps.md) for the full roadmap.
 
 🔜 **Consider for production:**
 - Authentication & authorization
-- Message persistence (database)
-- Message history
+- Durable message persistence (database — Redis history is ephemeral if Redis data is lost)
 - User presence tracking
 - TLS/SSL certificates
-- OTel exporter (OTLP, Prometheus, etc.) — instrumentation is wired, exporter is not
+- Swap console exporter for OTLP or Prometheus
 
 ## License
 

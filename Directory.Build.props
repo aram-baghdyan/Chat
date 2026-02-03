@@ -1,0 +1,18 @@
+﻿<Project>
+  <PropertyGroup>
+    <!-- Central Package Management -->
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+
+    <!-- Common settings for all projects -->
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+
+    <!-- Assembly info -->
+    <Company>Company</Company>
+    <Copyright>Copyright © $([System.DateTime]::Now.Year)</Copyright>
+    <RepositoryUrl>https://github.com/aram-baghdyan/Chat</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+  </PropertyGroup>
+</Project>

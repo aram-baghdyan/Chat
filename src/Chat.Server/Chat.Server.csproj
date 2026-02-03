@@ -1,9 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
   
   <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
-    <Nullable>enable</Nullable>
-    <ImplicitUsings>enable</ImplicitUsings>
     <UserSecretsId>dotnet-Chat.Server-d2806743-9f00-4c76-815d-e7a05e57e52f</UserSecretsId>
     <RootNamespace>Chat.Server</RootNamespace>
   </PropertyGroup>

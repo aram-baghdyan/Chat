@@ -7,13 +7,16 @@
   </Folder>
   <Folder Name="/root/">
     <File Path="compose.yaml" />
+    <File Path="Directory.Packages.props" />
+    <File Path="Directory.Build.props" />
     <File Path="README.md" />
   </Folder>
   <Folder Name="/src/">
-    <File Path="src/Directory.Build.props" />
-    <File Path="src/Directory.Packages.props" />
     <Project Path="src/Chat.Client/Chat.Client.csproj" />
     <Project Path="src/Chat.Server/Chat.Server.csproj" />
     <Project Path="src/Chat.Contracts/Chat.Contracts.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Chat.Server.Tests/Chat.Server.Tests.csproj" />
   </Folder>
 </Solution>
